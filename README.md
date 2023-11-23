@@ -11,22 +11,40 @@
 
 ## 1. 초기 세팅
 
-### 1.1 Git clone (초기 첫 작업 딱 한 번만!!!)
+### 1.1 개인 토큰 발급하기
+
+[참고 URL : https://heytech.tistory.com/393](https://heytech.tistory.com/393)
+
+1. Github Login 하기
+2. [개인 Setting으로 이동](https://github.com/settings/tokens)
+3. 좌측 하단의 Developer Settings 이동
+4. Personal access tokens --> Tokens(classic) 이동
+5. Generate new token (classic)
+6. repo에 체크 후 생성하기
+7. 개인 Token 복사하기(처음에만 복사 가능 이후 안 보여줌!!!)
+
+### 1.2 Git clone (초기 첫 작업 딱 한 번만!!!)
 
 ```bash
 # 작업할 디렉토리 이동 후(자세한 건 git_setting.ipynb 확인)
-git clone https://github.com/Arenslien/MJU-BDP-Project.git
+git clone https://[Github ID]:[Personal Token]@github.com/Arenslien/MJU-BDP-Project.git
+```
+```bash
+# 각자 Github 사용하는 이메일
+!git config --global user.email "Your@example.com"
+# Github ID
+!git config --global user.name "Your ID"
 ```
 
-### 1.2 Git 브랜치 설정
+### 1.3 Git 브랜치 설정
 
-1.2.1 작업할 branch 생성
+1.3.1 작업할 branch 생성
 
 ```bash
 git branch <각자 사용할 브랜치명>
 ```
 
-1.2.2 사용할 branch 설정
+1.3.2 사용할 branch 설정
 
 ```bash
 git checkout <사용할 브랜치 명>
@@ -99,5 +117,3 @@ git add *
 git commit -m "변경사항을 설명하는 메시지"
 git push origin <자신이 사용하는 브랜치 명>
 ```
-
-## 4. 추가 내용
