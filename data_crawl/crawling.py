@@ -47,6 +47,8 @@ async def scrape_arxiv(session, year, month, day):
 async def main():
     async with aiohttp.ClientSession() as session:
         years = list(range(2023, 2022, -1))  # 2023년만
+        # years = list(range(2022, 2021, -1))  # 2022년만
+        # years = list(range(2021, 2020, -1))  # 2021년만
         months = list(range(1, 13))  # 1월부터 12월까지
 
         for year in years:
@@ -74,3 +76,4 @@ if __name__=="__main__":
         csv_writer.writerows(all_papers)
         
 # 2022년도 완료
+# 2021년도 완료
