@@ -72,3 +72,5 @@ if __name__=="__main__":
 
         # 논문 정보 쓰기
         csv_writer.writerows(all_papers)
+        
+# 2022년도 완료
