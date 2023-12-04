@@ -1,1 +1,9 @@
-git_setting.ipynb
+# ipynb 파일 업로드 방지
+.ipynb
+
+# 데이터 파일 업로드 방지
+data/*.zip
+.csv
+
+# GloVe Pre-trained wordvector 업로드 방지
+model/glove.840B.300d.txt
