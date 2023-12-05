@@ -9,6 +9,8 @@ Original file is located at
 
 !pip install sentence_transformers
 
+# abstract만 학습한 코드
+
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -36,6 +38,8 @@ document_embeddings = sbert_model.encode(df['Abstract'].tolist())
 # Save document_embeddings to a file
 np.save('/content/drive/MyDrive/document_embeddings_big.npy', np.array(document_embeddings))
 
+# 전체를 학습한 코드
+
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -62,6 +66,8 @@ document_embeddings = sbert_model.encode(df['Combined_Text'].tolist())
 # Save document_embeddings to a file
 np.save('/content/drive/MyDrive/document_embeddings_full_df.npy', np.array(document_embeddings))
 
+# abstract로만 학습한 모델 불러와서 논문 검색
+
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
@@ -75,6 +81,36 @@ sbert_model = SentenceTransformer('bert-base-nli-mean-tokens', device='cuda')
 
 # 미리 계산된 document_embeddings 불러오기
 document_embeddings = np.load('/content/drive/MyDrive/document_embeddings_big.npy')
+
+# 사용자에게 입력 받은 Abstract
+user_input_abstract = input("Enter your abstract: ")
+
+# 사용자 입력을 데이터프레임에 추가
+user_df = pd.DataFrame({'Abstract': [user_input_abstract]})
+user_embedding = sbert_model.encode(user_df['Abstract'].tolist())
+
+# 유사도 계산
+pairwise_similarities = cosine_similarity(user_embedding, document_embeddings[:-1])  # 마지막 행은 사용자 입력이므로 제외
+most_similar_paper_index = pairwise_similarities[0].argmax()
+most_similar_paper = df.loc[most_similar_paper_index]
+
+print(f"\nMost Similar Paper:\nTitle: {most_similar_paper['Title']}\nCosine Similarity: {pairwise_similarities[0, most_similar_paper_index]}")
+
+# 전체로 학습한 모델 불러와서 논문 검색
+
+import numpy as np
+import pandas as pd
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# 데이터 로드
+df = pd.read_csv('/content/drive/MyDrive/paper_CS_2021.csv', encoding='utf-8')
+
+# Sentence Transformer 모델 로드 (GPU를 사용하려면 'cuda'로 설정)
+sbert_model = SentenceTransformer('bert-base-nli-mean-tokens', device='cuda')
+
+# 미리 계산된 document_embeddings 불러오기
+document_embeddings = np.load('/content/drive/MyDrive/document_embeddings_full_df.npy')
 
 # 사용자에게 입력 받은 Abstract
 user_input_abstract = input("Enter your abstract: ")
