@@ -22,20 +22,20 @@ if __name__=="__main__":
 			.option("escape", ",") \
 			.option("escape", '"') \
 			.csv("hdfs:///user/maria_dev/arxiv-data/2021/arxiv_CS_2021_full.csv")
-
-    # 2. Yearly(+ Monthly) Paper Publication Count
+	# cs_2021_full_df = cs_2021_full_df.limit(30)
+	
+  # 2. Yearly(+ Monthly) Paper Publication Count
 	
 	# 2.1 Monthly Paper Publication Counting
-	splited_df = cs_2021_full_df.groupBy("Month", "Word") \
-			.count()
-	
-	splited_df.show()
+	counted_df = cs_2021_full_df.groupBy("Month").count()
+	counted_df.show()
 	
 	# 2.2 Saving Counting per Month 
-	months = sorted_df.select("Month").distinct().collect()
+	months = counted_df.select("Month").distinct().collect()
 	
 	for row in months:
-		result = splited_df.where(col("Month") == row.Month)
+		result = counted_df.where(col("Month") == row.Month)
 		result.show()
-		result.write.csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/2021/{row.Month}MonthPublicationCounting.csv")
-		
+		save_dir = "hdfs:///user/maria_dev/arxiv-analysis-result/2021/publication-count-" +row.Month
+		result.write.csv(save_dir)
+

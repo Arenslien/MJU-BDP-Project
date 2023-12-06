@@ -23,9 +23,7 @@ if __name__=="__main__":
 			.option("escape", ",") \
 			.option("escape", '"') \
 			.csv("hdfs:///user/maria_dev/arxiv-data/2021/arxiv_CS_2021_full.csv")
-	cs_2021_full_df = cs_2021_full_df.limit(100)
-
-	# View Data
+	# cs_2021_full_df = cs_2021_full_df.limit(30)
 
 	# 2. Yearly(+ Monthly) Title Keyword Analysis
 	
@@ -48,4 +46,5 @@ if __name__=="__main__":
 	for row in months:
 		top_K_keyword = sorted_df.where(col("Month") == row.Month).limit(30)
 		top_K_keyword.show(10)
-		top_K_keyword.write.csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/2021/{row.Month}MonthTitleAnalysis.csv")
+		save_dir = "hdfs:///user/maria_dev/arxiv-analysis-result/2021/title-keyword-" + row.Month
+		top_K_keyword.write.csv(save_dir)
