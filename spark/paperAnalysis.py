@@ -1,46 +1,56 @@
 from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+from pyspark.sql.functions import split, explode, col, desc, row_number
 from pyspark.sql.window import Window
+import os
+
+# def get_all_folders(path):
+# 	hdfs = spark._jsparkSession.sparkContext._gateway \
+			
 
 if __name__=="__main__":
 	
 	# Creating SparkSession
 	spark = SparkSession.builder.appName("Yearly Paper Analysis").getOrCreate()
 	
-	# 1. Load Data
-	cs_2021_full_df = spark.read.option("header", "true").option("multiLine", "true").csv("hdfs:///user/maria_dev/arxiv-data/arxiv_CS_2021_full.csv")
-	# cs_2021_full_df = cs_2021_full_df.limit(100)
+	# 0. directory setting
+	#arxiv_data_dir = "hdfs:///user/maria_dev/arxiv-data"
+	#all_folders = get_all_folders(arxiv_data_dir)
+	#print(all_folders)
+
+	# 1. Load Data	
+	cs_2021_full_df = spark.read.option("header", "true") \
+			.option("multiLine", "true") \
+			.option("escape", ",") \
+			.option("escape", '"') \
+			.csv("hdfs:///user/maria_dev/arxiv-data/2021/arxiv_CS_2021_full.csv")
+	cs_2021_full_df = cs_2021_full_df.limit(100)
 
 	# View Data
-	cs_2021_full_df.show(5)
 
 	# 2. Yearly(+ Monthly) Abstract Keyword Analysis
+	
 	# 2.1 Split Abstract & Word Count
-	word_count_df = cs_2021_full_df.withColumn("Words", F.split(F.col("Abstract\r"), " ")) \
-			.select("Month", F.explode("Words").alias("Word")) \
-			.groupBy("Month", "Word") \
-			.count() \
-			.cache()
-	word_count_df.show(5)
+	splited_df = cs_2021_full_df.withColumn("Words", split(col("Abstract\r"), " ")) \
+			.select("Month", explode("Words").alias("Word"))
 	
-	# 2.2 Sorting by Count --> Desc
-	window_spec = Window.partitionBy("Month").orderBy(F.col("count").desc())
-	windowed_word_count_df = word_count_df.withColumn("row_num", F.row_number().over(window_spec))
-
-	# 2.3 Extract top K words
-	K=30
-	top_K_per_month = windowed_word_count_df.filter(F.col("row_num") <= K)
-
-	# 2.4 Print Result
-	top_K_per_month.show()
+	# 2.2 Word Count
+	word_count_df = splited_df.groupBy("Month", "Word") \
+			.count()
 	
-
+	# 2.3 Sorting  Count --> Desc
+	sorted_df = word_count_df.orderBy("Month", desc("count"))
+	sorted_df.show()
+	
+	# 2.4 Saving top K keyword per Month 
+	months = sorted_df.select("Month").distinct().collect()
+	
+	K = 30
+	for row in months:
+		top_K_keyword = sorted_df.where(col("Month") == row.Month).limit(30)
+		top_K_keyword.show(10)
+		top_K_keyword.write.csv("hdfs:///user/maria_dev/arxiv-analysis-result/2021/yearlyAbstractAnalysis.csv")
 
 	# 3. Yearly(+ Monthly) Title Keyword Analysis
 
-
 	# 4. Yearly(+ Monthly) Paper Publication Count
-
-
-	
 	
