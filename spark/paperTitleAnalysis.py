@@ -49,4 +49,3 @@ if __name__=="__main__":
 		top_K_keyword = sorted_df.where(col("Month") == row.Month).limit(30)
 		top_K_keyword.show(10)
 		top_K_keyword.write.csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/2021/{row.Month}MonthTitleAnalysis.csv")
-

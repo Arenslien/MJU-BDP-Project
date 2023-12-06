@@ -34,8 +34,8 @@ if __name__=="__main__":
 	# 2.2 Saving Counting per Month 
 	months = sorted_df.select("Month").distinct().collect()
 	
-	K = 30
 	for row in months:
-		top_K_keyword = splited_df.where(col("Month") == row.Month)
-		top_K_keyword.show(10)
-		top_K_keyword.write.csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/2021/{row.Month}MonthAbstractAnalysis.csv")
+		result = splited_df.where(col("Month") == row.Month)
+		result.show()
+		result.write.csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/2021/{row.Month}MonthPublicationCounting.csv")
+		
