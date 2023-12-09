@@ -5,5 +5,5 @@ export LC_ALL=en_US.UTF-8
 export PYSPARK_PYTHON='/bin/python3.6'
 spark-submit --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=/bin/python3.6 \
     --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=/bin/python3.6 \
-    arxiv_scraper_spark.py
+    c_tsv.py
 

@@ -1,9 +1,9 @@
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.ml.feature import StopWordsRemover, RegexTokenizer, Tokenizer
+from pyspark.ml.feature import StopWordsRemover, RegexTokenizer
 from pyspark.sql.types import StructType, StringType
 import re
-import os
 from urllib.parse import urlparse
 
 def get_all_path(spark, path):
@@ -14,7 +14,7 @@ def get_all_path(spark, path):
     all_paths = hadoop.fs.Path(path)
     dir_path = [str(f.getPath()) for f in fs.get(conf).listStatus(all_paths)]
 
-    parsed_path = ["hdfs://"+str(urlparse(f).path)+"/*/part-00000-*-c000.csv" for f in dir_path]
+    parsed_path = ["hdfs://" + str(urlparse(f).path) + "/*/part-00000-*-c000.csv" for f in dir_path]
 
     return parsed_path
 
@@ -22,7 +22,7 @@ def paper_processing(spark, df):
     df = df.withColumn('Title', F.regexp_replace('Title', 'Title: ', ''))
     df = df.withColumn('Authors', F.regexp_replace('Authors', 'Authors: ', ''))
     df = df.withColumn('Subjects', F.regexp_replace('Subjects', 'Subjects: ', ''))
-    df.show()
+
     return df
 
 if __name__ == "__main__":
@@ -33,14 +33,14 @@ if __name__ == "__main__":
 
     for dir in get_path:
         try:
-            check_csv = spark.read.option("header", "true")\
-                           .option("multiLine", "true")\
-                           .option('escape', ',')\
-                           .option('escape', '"')\
-                           .option("delimiter", ",")\
-                           .csv(dir)
-            if check_csv.count() > 0:
-                df = check_csv
+            check_tsv = spark.read.option("header", "true")\
+                .option("multiLine", "true")\
+                .option('escape', ',')\
+                .option('escape', '"')\
+                .option('delimiter', '\t')\
+                .csv(dir)
+            if check_tsv.count() > 0:
+                df = check_tsv
                 processed_df = paper_processing(spark, df)
                 processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
                 processed_df = processed_df.withColumn("Abstract\r", F.lower(F.col('Abstract\r')))
@@ -72,11 +72,9 @@ if __name__ == "__main__":
                 paper_year = str(match.group(1))
 
                 # Save file
-                df_new.write.option("header",True)\
-                      .csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/{paper_year}/StopWords_{paper_year}")
-
+                df_new.write.option("header", True)\
+                    .csv(f"hdfs:///user/maria_dev/arxiv-analysis-result/{paper_year}/StopWords_{paper_year}/")
 
         except Exception as e:
-
             pass
-        
+
