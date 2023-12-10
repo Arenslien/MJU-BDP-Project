@@ -14,9 +14,11 @@ def get_all_path(spark, path):
 	all_paths = hadoop.fs.Path(path)
 	dir_path = [str(f.getPath()) for f in fs.get(conf).listStatus(all_paths)]
 
-	parsed_path = ["hdfs://"+str(urlparse(f).path)+"/*/part-00000-*-c000.csv" for f in dir_path]
 
-	return parsed_path
+  parsed_path = ["hdfs://"+str(urlparse(f).path)+"/*/*.csv" for f in dir_path]
+
+
+  return parsed_path
 
 def get_all_csvpath(spark, path):
 	hadoop = spark._jvm.org.apache.hadoop
@@ -60,7 +62,6 @@ if __name__ == "__main__":
 					.csv(dir)
 
 			if check_csv.count() > 0:
-				print("hi")
 				df = check_csv
 				processed_df = paper_processing(spark, df)
 				processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
