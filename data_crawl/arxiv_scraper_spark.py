@@ -54,6 +54,8 @@ def main():
                     all_papers_rdd = all_papers_rdd.union(spark.sparkContext.parallelize(papers))
 
     all_papers_df = spark.createDataFrame(all_papers_rdd, ["Year", "Month", "Title", "Authors", "Subjects", "Abstract"])
+
+    all_papers_df = all_papers_df.dropDuplicates(["Title"])
     hdfs_path = 'hdfs:///user/maria_dev/archive_store/2021/all_papers'
     all_papers_df.coalesce(1).write.csv(hdfs_path, header=True, mode='overwrite')
 
