@@ -14,15 +14,15 @@ def get_all_path(spark, path):
     all_paths = hadoop.fs.Path(path)
     dir_path = [str(f.getPath()) for f in fs.get(conf).listStatus(all_paths)]
 
-    parsed_path = ["hdfs://"+str(urlparse(f).path)+"/*/part-00000-*-c000.csv" for f in dir_path]
+    parsed_path = ["hdfs://"+str(urlparse(f).path)+"/*/*.csv" for f in dir_path]
 
     return parsed_path
 
 def paper_processing(spark, df):
     df = df.withColumn('Title', F.regexp_replace('Title', 'Title: ', ''))
-    df = df.withColumn('Authors', F.regexp_replace('Authors', 'Authors: ', ''))
-    df = df.withColumn('Subjects', F.regexp_replace('Subjects', 'Subjects: ', ''))
-    df.show()
+    #df = df.withColumn('Authors', F.regexp_replace('Authors', 'Authors: ', ''))
+    #df = df.withColumn('Subjects', F.regexp_replace('Subjects', 'Subjects: ', ''))
+    #df.show()
     return df
 
 if __name__ == "__main__":
@@ -37,13 +37,14 @@ if __name__ == "__main__":
                            .option("multiLine", "true")\
                            .option('escape', ',')\
                            .option('escape', '"')\
-                           .option("delimiter", ",")\
-                           .csv(dir)
+                           .csv(dir)\
+                           .select("Year", "Month", "Title", "Abstract")
+                           
             if check_csv.count() > 0:
                 df = check_csv
                 processed_df = paper_processing(spark, df)
                 processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
-                processed_df = processed_df.withColumn("Abstract\r", F.lower(F.col('Abstract\r')))
+                processed_df = processed_df.withColumn("Abstract", F.lower(F.col('Abstract')))
 
                 # Specifying a Language for StopWords
                 eng_stopwords = StopWordsRemover.loadDefaultStopWords("english")
@@ -51,7 +52,7 @@ if __name__ == "__main__":
                 tk = RegexTokenizer(pattern=r'(?:\p{Punct}|\s)+', inputCol="Title", outputCol='tk_Title')
 
                 df1 = tk.transform(processed_df)
-                df1 = tk.setParams(inputCol="Abstract\r", outputCol="tk_Abstract").transform(df1)
+                df1 = tk.setParams(inputCol="Abstract", outputCol="tk_Abstract").transform(df1)
 
                 # Removing StopWords from the 'Title' column
                 sw = StopWordsRemover(inputCol='tk_Title', outputCol='sw_Title', stopWords=eng_stopwords)
