@@ -5,4 +5,5 @@ export LC_ALL=en_US.UTF-8
 export PYSPARK_PYTHON="/bin/python3.6"
 
 spark-submit --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=/bin/python3.6 \
-	stop_words.py
+    --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=/bin/python3.6 \
+	1.py
