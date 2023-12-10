@@ -47,9 +47,9 @@ if __name__ == "__main__":
 
                 # Specifying a Language for StopWords
                 eng_stopwords = StopWordsRemover.loadDefaultStopWords("english")
-
+								
                 tk = RegexTokenizer(pattern=r'(?:\p{Punct}|\s)+', inputCol="Title", outputCol='tk_Title')
-
+								
                 df1 = tk.transform(processed_df)
                 df1 = tk.setParams(inputCol="Abstract\r", outputCol="tk_Abstract").transform(df1)
 
