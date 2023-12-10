@@ -1,28 +1,41 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import split, explode, col, desc, row_number
 from pyspark.sql.window import Window
+from urllib.parse import urlparse
 import os
 
-# def get_all_folders(path):
-# 	hdfs = spark._jsparkSession.sparkContext._gateway \
-			
-if __name__=="__main__":
+def get_all_path(spark, path):
 	
+	hadoop = spark._jvm.org.apache.hadoop
+	fs = hadoop.fs.FileSystem
+	conf = hadoop.conf.Configuration()
+	all_paths = hadoop.fs.Path(path)
+	dir_path = [str(f.getPath()) for f in fs.get(conf).listStatus(all_paths)]
+	
+	parsed_path = ["hdfs://" + str(urlparse(f).path) + "/*/*.csv" for f in dir_path]
+	
+	return parsed_path
+
+
+if __name__=="__main__":
+
 	# Creating SparkSession
 	spark = SparkSession.builder.appName("Yearly Paper Analysis").getOrCreate()
 	
 	# 0. directory setting
-	#arxiv_data_dir = "hdfs:///user/maria_dev/arxiv-data"
-	#all_folders = get_all_folders(arxiv_data_dir)
-	#print(all_folders)
-
+	path = "hdfs:///user/maria_dev/arxiv-data/2015/"
+	get_path = get_all_path(spark, path)
+	print(get_path)
+	
+	#for dir in get_path:
+	
 	# 1. Load Data	
 	cs_2021_full_df = spark.read.option("header", "true") \
 			.option("multiLine", "true") \
 			.option("escape", ",") \
 			.option("escape", '"') \
 			.csv("hdfs:///user/maria_dev/arxiv-data/2021/arxiv_CS_2021_full.csv")
-	# cs_2021_full_df = cs_2021_full_df.limit(30)
+	cs_2021_full_df = cs_2021_full_df.limit(30)
 
 	# 2. Yearly(+ Monthly) Abstract Keyword Analysis
 	
