@@ -1,12 +1,26 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import split, explode, col, desc, row_number
+from pyspark.sql.functions import split, explode, col, desc, udf
 from pyspark.sql.window import Window
 from pyspark.sql import Row
 from pyspark.sql.types import StructField, StructType, StringType, LongType
 from urllib.parse import urlparse
 import os
+import nltk
+import string
+from nltk import ngrams
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
-def get_all_path(spark, path):
+nltk.download('punkt')
+nltk.download('stopwords')
+
+#불용어 리스트
+stop_words = set(stopwords.words('english'))  # 언어에 따라 변경 가능
+
+# 문장부호 문자열
+punctuation = set(string.punctuation)
+
+def get_all_csv_path(spark, path):
 	
 	hadoop = spark._jvm.org.apache.hadoop
 	fs = hadoop.fs.FileSystem
@@ -26,18 +40,23 @@ def get_all_path(spark, path):
 
 	return csv_paths
 
+def generate_bigram(text):
+	words = word_tokenize(text)
+	filtered_words = [word.lower() for word in words if word.lower() not in stop_words and word not in punctuation]
+	bigrams = ["_".join(gram) for gram in ngrams(filtered_words, 2)]
+
+	return " ".join(bigrams)
+
+
 if __name__=="__main__":
 
 	# Creating SparkSession
 	spark = SparkSession.builder.appName("Yearly Paper Analysis").getOrCreate()
 	
 	# 0. directory setting
-	path = "hdfs:///user/maria_dev/archive_store/stop_word/"
-	csv_paths = get_all_path(spark, path)
+	path = "hdfs:///user/maria_dev/archive_store/stop_word"
+	csv_paths = get_all_csv_path(spark, path)
 	print(csv_paths)
-	
-	all_years = []
-	all_year_publication = []
 	
 	publicationCountSchema = StructType([
 		StructField("Year", StringType(), nullable=False),
@@ -52,32 +71,40 @@ if __name__=="__main__":
 				.option("escape", ",") \
 				.option("escape", '"') \
 				.csv(csv_path)
-		csv_df = csv_df.limit(30)
+		csv_df.show(10)
 
 		# 2. Add Yearly Publication Counting
 		grouped_df = csv_df.groupBy("Year").count()
 		publication_count_df = publication_count_df.union(grouped_df)
 
-		# 3. Yearly(+ Monthly) Abstract Keyword Analysis
-		
+		# 3. Yearly Abstract Keyword Analysis --> Bigram
+		bigram_udf = udf(generate_bigram, StringType())
+		bigram_csv_df = csv_df.withColumn("Abstract_bigrams", bigram_udf(col("new_sw_Abstract")))\
+				.withColumn("Title_bigrams", bigram_udf(col("new_sw_Title")))
+
 		# 3.1 Split Abstract & Word Count
-		splited_df = csv_df.withColumn("Words", split(col("Abstract"), " ")) \
+		splited_df = bigram_csv_df.withColumn("Words", split(col("Abstract_bigrams"), " ")) \
+				.withColumn("Words_title", split(col("Title_bigrams"), " "))\
 				.select("Year", explode("Words").alias("Word"))
 		
-		# 3.2 Word Count
+		# 3.2 drop meaningless case 
+		drop_words = ["e_g", "log_n", "et_al", "1_2", "n_1", "n_2", "n_log", "2_n", "paper_present", "paper_presents", "paper_propose", "results show", "state_art", "well_known", "real_world", "proposed_method"]
+		splited_df = splited_df.filter(~col("Word").isin(*drop_words))
+		
+		# 3.3 Word Count
 		word_count_df = splited_df.groupBy("Year", "Word") \
 			.count()
 	
-		# 3.3 Sorting  Count --> Desc
+		# 3.4 Sorting  Count --> Desc
 		sorted_df = word_count_df.orderBy("Year", desc("count"))
 		sorted_df.show()
 	
-		# 3.4 Saving top K keyword per Month 
+		# 3.5 Saving top K keyword per Month 
 		years = sorted_df.select("Year").distinct().collect()
 	
-		K = 30
+		K = 20
 		for row in years:
-			top_K_keyword = sorted_df.where(col("Year") == row.Year).limit(30)
+			top_K_keyword = sorted_df.where(col("Year") == row.Year).limit(K)
 			top_K_keyword.show(10)
 			save_dir = "hdfs:///user/maria_dev/archive_store/abstract-keyword-" + row.Year
 			top_K_keyword.write.csv(save_dir)
