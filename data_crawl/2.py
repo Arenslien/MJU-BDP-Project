@@ -1,3 +1,4 @@
+
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 from bs4 import BeautifulSoup
@@ -5,11 +6,9 @@ import requests
 
 def extract_paper_info(entry):
     title = entry.find("div", class_="list-title mathjax").text.strip()
-    authors = [author.text.strip() for author in entry.find_all("a", href=lambda x: x and "/search/cs?searchtype=author" in x)]
-    subjects = [subject.text.strip() for subject in entry.find_all("span", class_="primary-subject")]
     abstract = entry.find("p", class_="mathjax").text.strip()
 
-    return title, authors, subjects, abstract
+    return title, abstract
 
 def fetch_page(url):
     try:
@@ -33,22 +32,20 @@ def crawl_papers(year, month, day):
         data = []
 
         for paper in papers:
-            title, authors, subjects, abstract = extract_paper_info(paper)
-            data.append([year, month, title, authors, subjects, abstract])
+            title, abstract = extract_paper_info(paper)
+            data.append([year, month, title, abstract])
 
         return data
     else:
         return []
 
 def main():
-    spark = SparkSession.builder.appName("1").getOrCreate()
+    spark = SparkSession.builder.appName("2").getOrCreate()
 
     schema = StructType([
         StructField("Year", IntegerType(), True),
         StructField("Month", IntegerType(), True),
         StructField("Title", StringType(), True),
-        StructField("Authors", StringType(), True),
-        StructField("Subjects", StringType(), True),
         StructField("Abstract", StringType(), True)
     ])
 
@@ -70,9 +67,10 @@ def main():
 
     # Remove duplicates, keeping the first occurrence
     all_papers_df = all_papers_df.dropDuplicates(subset=["Title"])
-    all_papers_df.show()
+
     hdfs_path = 'hdfs:///user/maria_dev/archive_store/2023'
     all_papers_df.coalesce(1).write.csv(hdfs_path, header=True, mode='overwrite')
+
 if __name__ == "__main__":
     main()
 

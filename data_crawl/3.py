@@ -1,5 +1,6 @@
+
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType, ArrayType
 from bs4 import BeautifulSoup
 import requests
 
@@ -41,14 +42,15 @@ def crawl_papers(year, month, day):
         return []
 
 def main():
-    spark = SparkSession.builder.appName("1").getOrCreate()
+    spark = SparkSession.builder.appName("3").getOrCreate()
 
+    # Update the schema to use ArrayType for Authors and Subjects
     schema = StructType([
         StructField("Year", IntegerType(), True),
         StructField("Month", IntegerType(), True),
         StructField("Title", StringType(), True),
-        StructField("Authors", StringType(), True),
-        StructField("Subjects", StringType(), True),
+        StructField("Authors", ArrayType(StringType()), True),
+        StructField("Subjects", ArrayType(StringType()), True),
         StructField("Abstract", StringType(), True)
     ])
 
@@ -70,9 +72,10 @@ def main():
 
     # Remove duplicates, keeping the first occurrence
     all_papers_df = all_papers_df.dropDuplicates(subset=["Title"])
-    all_papers_df.show()
+
     hdfs_path = 'hdfs:///user/maria_dev/archive_store/2023'
     all_papers_df.coalesce(1).write.csv(hdfs_path, header=True, mode='overwrite')
+
 if __name__ == "__main__":
     main()
 
