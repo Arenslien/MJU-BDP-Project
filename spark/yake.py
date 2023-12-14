@@ -30,7 +30,7 @@ get_keywords_udf = udf(get_keywords_yake, ArrayType(StructType([
 ])))
 
 # Read data from CSV file
-csv_path = "/user/maria_dev/arxiv-2023.csv"
+csv_path = "/user/maria_dev/archive_store/raw/arxiv-2023.csv"
 df = spark.read.csv(csv_path, header=True, schema=schema)
 
 # Apply the YAKE UDF to the DataFrame
