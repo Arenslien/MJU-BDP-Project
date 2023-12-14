@@ -13,6 +13,7 @@ from nltk.tokenize import word_tokenize
 
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download('averaged_perceptron_tagger')
 
 #불용어 리스트
 stop_words = set(stopwords.words('english'))  # 언어에 따라 변경 가능
@@ -43,7 +44,12 @@ def get_all_csv_path(spark, path):
 def generate_bigram(text):
 	words = word_tokenize(text)
 	filtered_words = [word.lower() for word in words if word.lower() not in stop_words and word not in punctuation]
-	bigrams = ["_".join(gram) for gram in ngrams(filtered_words, 2)]
+	
+	tagged_words = nltk.pos_tag(filtered_words)
+
+	noun_words = [word for word, tag in tagged_words if tag in ["NN", "NNS", "NNP", "NNPS"]]
+
+	bigrams = ["_".join(gram) for gram in ngrams(noun_words, 2)]
 
 	return " ".join(bigrams)
 
