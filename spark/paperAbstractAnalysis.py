@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import split, explode, col, desc, udf
+from pyspark.sql.functions import split, explode, col, desc, udf, regexp_replace
 from pyspark.sql.window import Window
 from pyspark.sql import Row
 from pyspark.sql.types import StructField, StructType, StringType, LongType
@@ -41,17 +41,16 @@ def get_all_csv_path(spark, path):
 
 	return csv_paths
 
-def generate_bigram(text):
-	words = word_tokenize(text)
-	filtered_words = [word.lower() for word in words if word.lower() not in stop_words and word not in punctuation]
-	
+def generate_trigram(text):
+	words = text.split(" ")
+	filtered_words = [word.lower() for word in words if len(word) > 2]
 	tagged_words = nltk.pos_tag(filtered_words)
 
-	noun_words = [word for word, tag in tagged_words if tag in ["NN", "NNS", "NNP", "NNPS"]]
+	noun_words = [word for word, tag in tagged_words if tag in ["NN", "NNS", "NNP", "NNPS", "JJ"]]
 
-	bigrams = ["_".join(gram) for gram in ngrams(noun_words, 2)]
+	trigrams = ["_".join(gram) for gram in ngrams(noun_words, 3)]
 
-	return " ".join(bigrams)
+	return " ".join(trigrams)
 
 
 if __name__=="__main__":
@@ -60,7 +59,7 @@ if __name__=="__main__":
 	spark = SparkSession.builder.appName("Yearly Paper Analysis").getOrCreate()
 	
 	# 0. directory setting
-	path = "hdfs:///user/maria_dev/archive_store/stop_word"
+	path = "hdfs:///user/maria_dev/archive_store/raw"
 	csv_paths = get_all_csv_path(spark, path)
 	print(csv_paths)
 	
@@ -77,25 +76,32 @@ if __name__=="__main__":
 				.option("escape", ",") \
 				.option("escape", '"') \
 				.csv(csv_path)
+		# csv_df = csv_df.limit(100)
 		csv_df.show(10)
 
 		# 2. Add Yearly Publication Counting
 		grouped_df = csv_df.groupBy("Year").count()
+		years = []
+		for row in grouped_df.collect():
+			print(row.Year)
+			years.append(row.Year)
 		publication_count_df = publication_count_df.union(grouped_df)
 
-		# 3. Yearly Abstract Keyword Analysis --> Bigram
-		bigram_udf = udf(generate_bigram, StringType())
-		bigram_csv_df = csv_df.withColumn("Abstract_bigrams", bigram_udf(col("new_sw_Abstract")))\
-				.withColumn("Title_bigrams", bigram_udf(col("new_sw_Title")))
+		# 3. Yearly Abstract Keyword Analysis --> Trigram
+		csv_df = csv_df.withColumn("Regex_Abstract", regexp_replace(col("Abstract"), "[^a-zA-Z\\s]", ""))
+		csv_df.show(5)
+
+		trigram_udf = udf(generate_trigram, StringType())
+		trigram_csv_df = csv_df.withColumn("Abstract_trigrams", trigram_udf(col("Regex_Abstract")))
+		#		.withColumn("Title_trigrams", trigram_udf(col("Title")))
 
 		# 3.1 Split Abstract & Word Count
-		splited_df = bigram_csv_df.withColumn("Words", split(col("Abstract_bigrams"), " ")) \
-				.withColumn("Words_title", split(col("Title_bigrams"), " "))\
+		splited_df = trigram_csv_df.withColumn("Words", split(col("Abstract_trigrams"), " ")) \
 				.select("Year", explode("Words").alias("Word"))
 		
 		# 3.2 drop meaningless case 
-		drop_words = ["e_g", "log_n", "et_al", "1_2", "n_1", "n_2", "n_log", "2_n", "paper_present", "paper_presents", "paper_propose", "results show", "state_art", "well_known", "real_world", "proposed_method"]
-		splited_df = splited_df.filter(~col("Word").isin(*drop_words))
+		#drop_words = ["e_g", "log_n", "et_al", "1_2", "n_1", "n_2", "n_log", "2_n", "paper_present", "paper_presents", "paper_propose", "results show", "state_art", "well_known", "real_world", "proposed_method"]
+		#splited_df = splited_df.filter(~col("Word").isin(*drop_words))
 		
 		# 3.3 Word Count
 		word_count_df = splited_df.groupBy("Year", "Word") \
@@ -106,13 +112,11 @@ if __name__=="__main__":
 		sorted_df.show()
 	
 		# 3.5 Saving top K keyword per Month 
-		years = sorted_df.select("Year").distinct().collect()
-	
-		K = 20
-		for row in years:
-			top_K_keyword = sorted_df.where(col("Year") == row.Year).limit(K)
-			top_K_keyword.show(10)
-			save_dir = "hdfs:///user/maria_dev/archive_store/abstract-keyword-" + row.Year
+		K = 30
+		for year in years:
+			top_K_keyword = sorted_df.where(col("Year") == year).limit(K)
+			top_K_keyword.show(K)
+			save_dir = "hdfs:///user/maria_dev/archive_store/abstract-keyword-" + year
 			top_K_keyword.write.csv(save_dir)
 	
 	# 2.1 Save Yearly Publication Count
