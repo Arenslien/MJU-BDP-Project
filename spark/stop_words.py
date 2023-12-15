@@ -15,34 +15,20 @@ def get_all_csv_path(spark, path):
 	input_path = hadoop.fs.Path(path)
 	csv_paths = [str(file.getPath()) for file in fs.get(conf).listStatus(input_path)]
 
-<<<<<<< HEAD
-    parsed_path = ["hdfs://"+str(urlparse(f).path)+"/part-00000-*-c000.csv" for f in dir_path]
-=======
 	for csv_path in csv_paths:
 		if csv_path.endswith(".csv"):
 			csv_file_dir = "hdfs:///" + str(urlparse(csv_path).path)
 			all_csv_files.append(csv_file_dir)
->>>>>>> a8cd50dad9899d723729366547c5066dcd76c821
 
 	return all_csv_files
 
 def paper_processing(spark, df):
-<<<<<<< HEAD
     df = df.withColumn('Title', F.regexp_replace('Title', 'Title: ', ''))
     #df = df.withColumn('Authors', F.regexp_replace('Authors', 'Authors: ', ''))
     #df = df.withColumn('Subjects', F.regexp_replace('Subjects', 'Subjects: ', ''))
     df.show()
+    
     return df
-
-if __name__ == "__main__":
-    spark = SparkSession.builder.appName("stop_words").getOrCreate()
-=======
-	df = df.withColumn('Title', F.regexp_replace('Title', 'Title: ', ''))
-	df = df.withColumn('Authors', F.regexp_replace('Authors', 'Authors: ', ''))
-	df = df.withColumn('Subjects', F.regexp_replace('Subjects', 'Subjects: ', ''))
-	df.show()
-
-	return df
 
 if __name__ == "__main__":
 	spark = SparkSession.builder.appName("PaperProcessing").getOrCreate()
@@ -51,7 +37,6 @@ if __name__ == "__main__":
 	csv_paths = get_all_csv_path(spark, path)
 	print("get_path")
 	print(csv_paths)
->>>>>>> a8cd50dad9899d723729366547c5066dcd76c821
 
 	for csv_path in csv_paths:
 		check_csv = spark.read.option("header", "true")\
@@ -61,29 +46,11 @@ if __name__ == "__main__":
 				.option("delimiter", ",")\
 				.csv(csv_path)
 
-<<<<<<< HEAD
-    for dir in get_path:
-        try:
-            check_csv = spark.read.option("header", "true").csv(dir)
-            check_csv.show()
-#            check_csv = spark.read.option("header", "true")\
- #                          .option("multiLine", "true")\
-  #                         .option('escape', ',')\
-   #                        .option('escape', '"')\
-    #                       .option("delimiter", ",")\
-     #                      .csv(dir)
-            if check_csv.count() > 0:
-                df = check_csv
-                processed_df = paper_processing(spark, df)
-                processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
-                processed_df = processed_df.withColumn("Abstract\r", F.lower(F.col('Abstract\r')))
-=======
-		if check_csv.count() > 0:
-			df = check_csv
-			processed_df = paper_processing(spark, df)
-			processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
-			processed_df = processed_df.withColumn("Abstract", F.lower(F.col('Abstract')))
->>>>>>> a8cd50dad9899d723729366547c5066dcd76c821
+        if check_csv.count() > 0:
+            df = check_csv
+            processed_df = paper_processing(spark, df)
+            processed_df = processed_df.withColumn("Title", F.lower(processed_df.Title))
+            processed_df = processed_df.withColumn("Abstract", F.lower(F.col('Abstract')))
 
 			# Specifying a Language for StopWords
 			eng_stopwords = StopWordsRemover.loadDefaultStopWords("english")
