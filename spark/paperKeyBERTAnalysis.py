@@ -5,10 +5,10 @@ from pyspark.sql import Row
 from pyspark.sql.types import StructField, StructType, StringType, LongType
 from urllib.parse import urlparse
 import os
-import nltk
 import string
+import json
+import nltk
 from keybert import KeyBERT
-from nltk import ngrams
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -16,13 +16,13 @@ nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
 
-keyBERT_model = KeyBERT(model='all-mpnet-base-v2')
-
 #불용어 리스트
 stop_words = set(stopwords.words('english'))  # 언어에 따라 변경 가능
 
 # 문장부호 문자열
 punctuation = set(string.punctuation)
+
+keyBERT_model = KeyBERT(model='all-MiniLM-L6-v2')
 
 def get_all_csv_path(spark, path):
 	
@@ -44,24 +44,18 @@ def get_all_csv_path(spark, path):
 
 	return csv_paths
 
-def generate_bigram(text):
+def extract_keywords_KeyBERT(text):
 	words = word_tokenize(text)
 	filtered_words = [word.lower() for word in words if word.lower() not in stop_words and word not in punctuation]
-	
 	tagged_words = nltk.pos_tag(filtered_words)
-
-	noun_words = [word for word, tag in tagged_words if tag in ["NN", "NNS", "NNP", "NNPS"]]
-
-	bigrams = ["_".join(gram) for gram in ngrams(noun_words, 2)]
-
-	return " ".join(bigrams)
-
-def extract_keywords_KeyBERT(text):
+	noun_words = " ".join([word for word, tag in tagged_words if tag in ["NN", "NNS", "NNP", "NNPS"]])
+	
 	keywords = keyBERT_model.extract_keywords(text,
-			keyphrase_ngram_range=(1, 3),
-			stop_words='english',
+			keyphrase_ngram_range=(1, 1),
+			stop_words=None,
 			highlight=False,
-			top_n=10
+			top_n=5,
+			use_maxsum=True
 	)
 
 	result = []
@@ -76,7 +70,11 @@ def extract_keywords_KeyBERT(text):
 if __name__=="__main__":
 
 	# Creating SparkSession
-	spark = SparkSession.builder.appName("Yearly Paper Analysis").getOrCreate()
+	spark = SparkSession.builder \
+			.appName("Yearly Paper Analysis") \
+			.config("spark.executor.cores", 4) \
+			.config("spark.sql.shuffle.partitions", 100) \
+			.getOrCreate()
 	
 	# 0. directory setting
 	path = "hdfs:///user/maria_dev/archive_store/raw"
@@ -95,50 +93,46 @@ if __name__=="__main__":
 				.option("multiLine", "true") \
 				.option("escape", ",") \
 				.option("escape", '"') \
-				.csv(csv_path)
+				.csv(csv_path).cache()
 		csv_df.show(10)
 
 		# 2. Add Yearly Publication Counting
 		grouped_df = csv_df.groupBy("Year").count()
-		publication_count_df = publication_count_df.union(grouped_df)
+		years = []
+		publication_count_dict = {}
+		for row in grouped_df.collect():
+			year = row["Year"]
+			years.append(year)
+			publication_count_dict[year] = int(row["count"])
 
 		# 3. Yearly Abstract Keyword Analysis --> KeyBERT
 		keybert_udf = udf(extract_keywords_KeyBERT, StringType())
-		keybert_csv_df = csv_df.withColumn("Abstract_KeyBERT", keybert_udf(col("Abstract"))) \
-				.withColumn("Title_KeyBERT", keybert_udf(col("Title"))) # new_sw_Title
-		
-		bigram_udf = udf(generate_bigram, StringType())
-		bigram_csv_df = csv_df.withColumn("Abstract_bigrams", bigram_udf(col("new_sw_Abstract")))\
-				.withColumn("Title_bigrams", bigram_udf(col("new_sw_Title")))
-
+		keybert_csv_df = csv_df.withColumn("Abstract_KeyBERT", keybert_udf(col("Abstract"))).cache()
 		# 3.1 Split Abstract & Word Count
-		splited_df = keybert_csv_df.withColumn("Words", split(col("Abstract_bigrams"), " ")) \
-				.withColumn("Words_title", split(col("Title_bigrams"), " "))\
+		splited_df = keybert_csv_df.withColumn("Words", split(col("Abstract_KeyBERT"), " ")) \
 				.select("Year", explode("Words").alias("Word"))
 
 		# 3.2 drop meaningless case 
-		drop_words = ["e_g", "log_n", "et_al", "1_2", "n_1", "n_2", "n_log", "2_n", "paper_present", "paper_presents", "paper_propose", "results show", "state_art", "well_known", "real_world", "proposed_method"]
-		splited_df = splited_df.filter(~col("Word").isin(*drop_words))
+		#drop_words = ["e_g", "log_n", "et_al", "1_2", "n_1", "n_2", "n_log", "2_n", "paper_present", "paper_presents", "paper_propose", "results show", "state_art", "well_known", "real_world", "proposed_method"]
+		#splited_df = splited_df.filter(~col("Word").isin(*drop_words))
 		
 		# 3.3 Word Count
 		word_count_df = splited_df.groupBy("Year", "Word") \
-			.count()
+			.count().cache()
 	
 		# 3.4 Sorting  Count --> Desc
 		sorted_df = word_count_df.orderBy("Year", desc("count"))
-		sorted_df.show()
 	
 		# 3.5 Saving top K keyword per Month 
-		years = sorted_df.select("Year").distinct().collect()
-	
 		K = 30
-		for row in years:
-			top_K_keyword = sorted_df.where(col("Year") == row.Year).limit(K)
-			top_K_keyword.show(K)
-			save_dir = "hdfs:///user/maria_dev/archive_store/abstract-keyword-" + row.Year
+		for year in years:
+			top_K_keyword = sorted_df.where(col("Year") == year).limit(K)
+			save_dir = "hdfs:///user/maria_dev/archive_store/abstract-keyword-" + year
 			top_K_keyword.write.csv(save_dir)
+			top_K_keyword.show(K)
 	
 	# 2.1 Save Yearly Publication Count
 	save_dir2 = "hdfs:///user/maria_dev/archive_store/Yearly-Publication-Count"
-	publication_count_df.write.csv(save_dir2)
+	with open("./Yearly_Publication_Count.json", "w") as json_file:
+		json.dump(publication_count_dict, json_file)
 
