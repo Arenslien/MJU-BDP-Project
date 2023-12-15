@@ -85,7 +85,3 @@ if __name__ == "__main__":
 				print(save_dir)
 				save_df.write.option("header", "true").csv(save_dir)
 				print("SAVE: " + row.Year)
-
-
-	
-
